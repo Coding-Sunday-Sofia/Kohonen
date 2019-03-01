@@ -7,7 +7,7 @@
 #include <time.h>
 #include "huebar_color.h"
 
-// START Kohonen Algorithm defines and global variables
+/* START Kohonen Algorithm defines and global variables. */
 #define MAP_WIDTH 80
 #define MAP_HEIGHT 60
 #define NORMALIZATION_VALUE 10000
@@ -51,24 +51,20 @@ uint* samples_max_components_values;
 uint* samples_min_components_values;
 int initial_radius = 80;
 float round_radius;
+/* END Kohonen definitions and global variables. */
 
-// END Kohonen definitions and global variables
-
-// START k-Means Algorithm defines and global variables
-#define distance(i, j)   (datax(j) - datax(i)) * (datax(j) - datax(i)) + (datay(j) - datay(i)) * (datay(j) - datay(i))
-
+/* START k-Means Algorithm defines and global variables. */
+#define distance(i, j) (datax(j) - datax(i)) * (datax(j) - datax(i)) + (datay(j) - datay(i)) * (datay(j) - datay(i))
 
 typedef int bool;
 
 int total_samples;
+/* END k-Means definitions and global variables. */
 
-// END k-Means definitions and global variables
-
-// START Kohonen algorithm methods
-
+/* START Kohonen algorithm methods. */
 unsigned int randr(unsigned int min, unsigned int max) {
 	double scaled = (double)rand()/RAND_MAX;
-	return (max - min +1)*scaled + min;
+	return (max - min + 1)*scaled + min;
 }
 
 char** explode_string(char* a_str, const char a_delim, int* total_items) {
@@ -93,8 +89,7 @@ char** explode_string(char* a_str, const char a_delim, int* total_items) {
 	count += last_comma < (a_str + strlen(a_str) - 1);
 	*total_items = count;
 
-	/* Add space for terminating null string so caller
-	   knows where the list of returned strings ends. */
+	/* Add space for terminating null string so caller knows where the list of returned strings ends. */
 	count++;
 
 	result = malloc(sizeof(char*) * count);
@@ -160,7 +155,7 @@ void load_and_initialize_samples(char *filename) {
 
 	printf("\n\nTotal samples: %d\n\n", total_samples);
 
-	// 'samples' is the data structure used to store the sample points for Kohonen algorithm process
+	/* Variable 'samples' is the data structure used to store the sample points for Kohonen algorithm process. */
 	samples = (Sample *) malloc(sizeof(Sample) * total_samples);
 
 	for(int i = 0; i < total_samples; i++) {
@@ -206,7 +201,6 @@ void load_and_initialize_samples(char *filename) {
 			samples[i].components[e] = (unsigned int)(((value - samples_min_components_values[e]) * NORMALIZATION_VALUE)/(samples_max_components_values[e] - samples_min_components_values[e]));
 		}
 	}
-
 }
 
 void initialize_som_map() {
@@ -226,11 +220,10 @@ void initialize_som_map() {
 			}
 		}
 	}
-
 }
 
 Sample* pick_random_sample() {
-	int i = randr(0,total_samples - 1);
+	int i = randr(0, total_samples-1);
 	return &samples[i];
 }
 
@@ -283,7 +276,6 @@ Coordinate* new_coordinate(float x, float y) {
 }
 
 void scale_neuron_at_position(int x, int y, Sample *sample, double scale) {
-
 	float neuron_prescaled, neuron_scaled;
 	Neuron *neuron = &map[x][y];
 
@@ -292,11 +284,9 @@ void scale_neuron_at_position(int x, int y, Sample *sample, double scale) {
 		neuron_scaled = (sample->components[i] * scale) + neuron_prescaled;
 		neuron->components[i] = (int)neuron_scaled;
 	}
-
 }
 
 void scale_neighbors(BMU *bmu, Sample *sample, float t) {
-
 	float iteration_radius = roundf((float)(round_radius)*(1.0f-t));
 	Coordinate *outer = new_coordinate(iteration_radius,iteration_radius);
 	Coordinate *center = new_coordinate(0.0f,0.0f);
@@ -309,14 +299,20 @@ void scale_neighbors(BMU *bmu, Sample *sample, float t) {
 	for(float y = -iteration_radius; y<iteration_radius; y++) {
 		for(float x = -iteration_radius; x<iteration_radius; x++) {
 			if((y + bmu->y_coord) >= 0 && (y + bmu->y_coord) < MAP_HEIGHT && (x + bmu->x_coord)>=0 && (x + bmu->x_coord) < MAP_WIDTH) {
-
 				outer->x = x;
 				outer->y = y;
 				distance = get_coordinate_distance(outer,center);
 				distance /= distance_normalized;
 
+				/* Gaussian function. */
 				scale = exp(-1.0f * (pow(distance, 2.0f)) / 0.15f);
-				scale /= (t*4.0f + 1.0f); // +1 is to avoid divide by 0's
+				/* Exponential regulated cosine function. */
+				//scale = cos(distance) / exp( fabs(distance) );
+				/* Fading cosine function. */
+				//scale = (-M_PI/2 <= distance && distance <= +M_PI/2) ? ( cos(distance) ) : ( cos(distance)/fabs(distance) );
+
+				/* It is needed +1 is to avoid divide by 0's. */
+				scale /= (t*4.0f + 1.0f);
 
 				x_coord = bmu->x_coord + x;
 				y_coord = bmu->y_coord + y;
