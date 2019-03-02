@@ -8,65 +8,139 @@
 #include "huebar_color.h"
 
 /* START Kohonen Algorithm defines and global variables. */
+
+/** SOM width. */
 #define MAP_WIDTH 80
+
+/** SOM height. */
 #define MAP_HEIGHT 60
+
+/** Scaling factor. */
 #define NORMALIZATION_VALUE 10000
+
+/** Power of two macros. */
 #define pow2(x) ((x) * (x))
+
+/** Big integer nubmer. */
 #define BIG_NUM          999999999999999999
+
+/** File line length limit. */
 #define LINE_SIZE        300
+
+/** In C boolean values are not predefined. */
 #define FALSE            0
+
+/** In C boolean values are not predefined. */
 #define TRUE             1
+
+/** Alias of unsigned integer. */
 #define uint             unsigned int
+
+/** Alias of unsigned long. */
 #define uint64           unsigned long
 
+/** KNN neuron definition. */
 typedef struct Neuron {
+	/** List of neurons. */
 	unsigned int* components;
 } Neuron;
 
+/** Best matching unit coordinates structure. */
 typedef struct BMU {
+	/** Column. */
 	unsigned int x_coord;
+
+	/** Row. */
 	unsigned int y_coord;
 } BMU;
 
+/** Coordinates of the centroid in the best macthing unit cluster. */
 typedef struct CentroidBMU {
+	/** Column. */
 	unsigned int x_coord;
+
+	/** Row. */
 	unsigned int y_coord;
+
+	/** Nubmer of units in the cluster. */
 	int count;
 } CentroidBMU;
 
+/** Cartesian coordinates structure. */
 typedef struct Coordinate {
+	/** X axis value. */
 	float x;
+
+	/** Y axis value. */
 	float y;
 } Coordinate;
 
+/** Training samples structure. */
 typedef struct Sample {
+	/** List of training samples. */
 	unsigned int* components;
 } Sample;
 
+/** Map as matrix of neurons. */
 Neuron** map;
+
+/** List of samples. */
 Sample* samples;
+
+/** */
 int total_components;
+
+/** */
 char** components_name;
+
+/** */
 uint* samples_max_components_values;
+
+/** */
 uint* samples_min_components_values;
+
+/** */
 int initial_radius = 80;
+
+/** */
 float round_radius;
+
 /* END Kohonen definitions and global variables. */
 
 /* START k-Means Algorithm defines and global variables. */
+
+/** Euclidean distance macros definition. */
 #define distance(i, j) (datax(j) - datax(i)) * (datax(j) - datax(i)) + (datay(j) - datay(i)) * (datay(j) - datay(i))
 
+/** Definition of a boolean type. */
 typedef int bool;
 
+/** Total number of training samples. */
 int total_samples;
+
 /* END k-Means definitions and global variables. */
 
 /* START Kohonen algorithm methods. */
-unsigned int randr(unsigned int min, unsigned int max) {
-	double scaled = (double)rand()/RAND_MAX;
-	return (max - min + 1)*scaled + min;
-}
 
+/**
+ * Pseudo randum number generator scaling function.
+ *
+ * @param min Lower bound of the generated numbers.
+ * @param max Upper bound of the generated numbers.
+ *
+ * @return Uniform distributed pseudo-random number into the specified range.
+ */
+#define randr(min, max) ((max - min + 1) * (double)rand() / RAND_MAX + min)
+
+/**
+ * Separate string in tokens.
+ *
+ * @param a_str String to split.
+ * @param a_delim Splitting delimiters.
+ * @param total_items Total number of expected tokens.
+ *
+ * @return List of tokens.
+ */
 char** explode_string(char* a_str, const char a_delim, int* total_items) {
 	char** result    = 0;
 	size_t count     = 0;
@@ -89,7 +163,10 @@ char** explode_string(char* a_str, const char a_delim, int* total_items) {
 	count += last_comma < (a_str + strlen(a_str) - 1);
 	*total_items = count;
 
-	/* Add space for terminating null string so caller knows where the list of returned strings ends. */
+	/*
+	 * Add space for terminating null string so caller knows where the list of
+	 * returned strings ends.
+	 */
 	count++;
 
 	result = malloc(sizeof(char*) * count);
@@ -108,14 +185,23 @@ char** explode_string(char* a_str, const char a_delim, int* total_items) {
 	return result;
 }
 
+/**
+ * Convert string to integer.
+ *
+ * @param a String value.
+ *
+ * @return Integer value.
+ */
 int stringToInteger(char a[]) {
 	int c, sign, offset, n;
 
-	if (a[0] == '-') {  // Handle negative integers
+	/* Handle negative integers. */
+	if (a[0] == '-') {
 		sign = -1;
 	}
 
-	if (sign == -1) {  // Set starting position to convert
+	/* Set starting position to convert. */
+	if (sign == -1) {
 		offset = 1;
 	} else {
 		offset = 0;
@@ -134,6 +220,11 @@ int stringToInteger(char a[]) {
 	return n;
 }
 
+/**
+ * Load training samples from a file.
+ *
+ * @param filename File name for the file with samples.
+ */
 void load_and_initialize_samples(char *filename) {
 	FILE *file;
 	char line[LINE_SIZE];
@@ -155,14 +246,17 @@ void load_and_initialize_samples(char *filename) {
 
 	printf("\n\nTotal samples: %d\n\n", total_samples);
 
-	/* Variable 'samples' is the data structure used to store the sample points for Kohonen algorithm process. */
+	/*
+	 * Variable 'samples' is the data structure used to store the sample points
+	 * for Kohonen algorithm process.
+	 */
 	samples = (Sample *) malloc(sizeof(Sample) * total_samples);
 
 	for(int i = 0; i < total_samples; i++) {
 		samples[i].components = (unsigned int *) malloc(sizeof(unsigned int) * total_components);
 	}
 
-	// read data from file into array
+	/* Read data from file into array. */
 	file = fopen(filename, "rt");
 	fgets(line, LINE_SIZE, file);
 	components_name = explode_string(line, ',', &total_components);
@@ -170,13 +264,13 @@ void load_and_initialize_samples(char *filename) {
 	samples_max_components_values = (uint*) malloc(sizeof(uint) * total_components);
 	samples_min_components_values = (uint*) malloc(sizeof(uint) * total_components);
 
-	// Initialize max values array to blank
+	/* Initialize max values array to blank. */
 	for(int e = 0; e < total_components; e++) {
 		samples_max_components_values[e] = 0;
 		samples_min_components_values[e] = 0;
 	}
 
-	// Load values from file
+	/* Load values from file. */
 	for (int i = 0; i < total_samples; i++) {
 		fgets(line, LINE_SIZE, file);
 		line_components = explode_string(line, ',', &total_line_components);
@@ -194,7 +288,7 @@ void load_and_initialize_samples(char *filename) {
 
 	fclose(file);
 
-	// Normalize values based on max value of each component from 0 to 255
+	/* Normalize values based on max value of each component from 0 to 255. */
 	for (int i = 0; i < total_samples; i++) {
 		for(int e = 0; e < total_components; e++) {
 			value = samples[i].components[e];
@@ -203,6 +297,9 @@ void load_and_initialize_samples(char *filename) {
 	}
 }
 
+/**
+ * SOM initialization.
+ */
 void initialize_som_map() {
 	map = (Neuron **) malloc(sizeof(Neuron *) * MAP_WIDTH);
 
@@ -222,15 +319,33 @@ void initialize_som_map() {
 	}
 }
 
+/**
+ * Random sample selection.
+ *
+ * @return Pointer ot selected sample.
+ */
 Sample* pick_random_sample() {
 	int i = randr(0, total_samples-1);
 	return &samples[i];
 }
 
+/**
+ * Index sample selection.
+ *
+ * @return Pointer ot selected sample.
+ */
 Sample* pick_sample(int i) {
 	return &samples[i];
 }
 
+/**
+ * Calculates distance between sample and SOM neuron.
+ *
+ * @param sample Sample pointer.
+ * @param neuron Neuron pointer.
+ *
+ * @return Calculated distance.
+ */
 uint distance_between_sample_and_neuron(Sample *sample, Neuron *neuron) {
 	unsigned int euclidean_distance = 0;
 	unsigned int component_diff;
@@ -244,6 +359,13 @@ uint distance_between_sample_and_neuron(Sample *sample, Neuron *neuron) {
 	//return sqrt(euclidean_distance);
 }
 
+/**
+ * Searchs for best mathcing unit.
+ *
+ * @param sample Sample pointer.
+ *
+ * @return Pointer to the best matching unit.
+ */
 BMU* search_bmu(Sample *sample) {
 	uint max_dist=999999999;
 	uint dist = 0;
@@ -259,22 +381,50 @@ BMU* search_bmu(Sample *sample) {
 			}
 		}
 	}
+
 	return bmu;
 }
 
+/**
+ * Calculates disttance between particular coordinates.
+ *
+ * @param p1 First point.
+ * @param p2 Second point.
+ *
+ * @return Calculated distance.
+ */
 float get_coordinate_distance(Coordinate *p1, Coordinate *p2) {
 	float x_sub = (p1->x) - (p2->x);
 	float y_sub = (p1->y) - (p2->y);
+
 	return sqrt(x_sub*x_sub + y_sub*y_sub);
 }
 
+/**
+ * Creates coordinates object from given x and y values.
+ *
+ * @param x X value.
+ * @param y Y value.
+ *
+ * @return Coordinates object.
+ */
 Coordinate* new_coordinate(float x, float y) {
 	Coordinate *coordinate = malloc(sizeof(Coordinate));
+
 	coordinate->x = x;
 	coordinate->y = y;
+
 	return coordinate;
 }
 
+/**
+ * Select neuron at particualr positon.
+ *
+ * @param x X coordinate.
+ * @param y Y coordinate.
+ * @param sample Sample pointer.
+ * @param scale Scaling factor.
+ */
 void scale_neuron_at_position(int x, int y, Sample *sample, double scale) {
 	float neuron_prescaled, neuron_scaled;
 	Neuron *neuron = &map[x][y];
@@ -286,6 +436,13 @@ void scale_neuron_at_position(int x, int y, Sample *sample, double scale) {
 	}
 }
 
+/**
+ * Select neighbours.
+ *
+ * @param bmu Best matching unit pointer.
+ * @param sample Sample pointer.
+ * @param t
+ */
 void scale_neighbors(BMU *bmu, Sample *sample, float t) {
 	float iteration_radius = roundf((float)(round_radius)*(1.0f-t));
 	Coordinate *outer = new_coordinate(iteration_radius,iteration_radius);
@@ -298,26 +455,44 @@ void scale_neighbors(BMU *bmu, Sample *sample, float t) {
 
 	for(float y = -iteration_radius; y<iteration_radius; y++) {
 		for(float x = -iteration_radius; x<iteration_radius; x++) {
-			if((y + bmu->y_coord) >= 0 && (y + bmu->y_coord) < MAP_HEIGHT && (x + bmu->x_coord)>=0 && (x + bmu->x_coord) < MAP_WIDTH) {
-				outer->x = x;
-				outer->y = y;
-				distance = get_coordinate_distance(outer,center);
-				distance /= distance_normalized;
-
-				/* Gaussian function. */
-				scale = exp(-1.0f * (pow(distance, 2.0f)) / 0.15f);
-				/* Exponential regulated cosine function. */
-				//scale = cos(distance) / exp( fabs(distance) );
-				/* Fading cosine function. */
-				//scale = (-M_PI/2 <= distance && distance <= +M_PI/2) ? ( cos(distance) ) : ( cos(distance)/fabs(distance) );
-
-				/* It is needed +1 is to avoid divide by 0's. */
-				scale /= (t*4.0f + 1.0f);
-
-				x_coord = bmu->x_coord + x;
-				y_coord = bmu->y_coord + y;
-				scale_neuron_at_position(x_coord, y_coord, sample, scale);
+			/* Out of bounds. */
+			if(y + bmu->y_coord < 0) {
+				continue;
 			}
+
+			/* Out of bounds. */
+			if(y + bmu->y_coord >= MAP_HEIGHT) {
+				continue;
+			}
+
+			/* Out of bounds. */
+			if(x + bmu->x_coord < 0) {
+				continue;
+			}
+
+			/* Out of bounds. */
+			if(x + bmu->x_coord >= MAP_WIDTH) {
+				continue;
+			}
+
+			outer->x = x;
+			outer->y = y;
+
+			distance = get_coordinate_distance(outer,center) / distance_normalized;
+
+			/* Gaussian function. */
+			scale = exp(-1.0f * (pow(distance, 2.0f)) / 0.15f);
+			/* Exponential regulated cosine function. */
+			//scale = cos(distance) / exp( fabs(distance) );
+			/* Fading cosine function. */
+			//scale = (-M_PI/2 <= distance && distance <= +M_PI/2) ? ( cos(distance) ) : ( cos(distance)/fabs(distance) );
+
+			/* It is needed +1 is to avoid divide by 0's. */
+			scale /= (t*4.0f + 1.0f);
+
+			x_coord = bmu->x_coord + x;
+			y_coord = bmu->y_coord + y;
+			scale_neuron_at_position(x_coord, y_coord, sample, scale);
 		}
 	}
 
@@ -325,6 +500,9 @@ void scale_neighbors(BMU *bmu, Sample *sample, float t) {
 	free(center);
 }
 
+/**
+ * Release of the allocated memory.
+ */
 void free_allocated_memory() {
 	for(int e = 0; e < total_components; e++) {
 		free(components_name[e]);
@@ -348,17 +526,45 @@ void free_allocated_memory() {
 	free(samples_min_components_values);
 }
 
+/**
+ * Strings concatenation.
+ *
+ * @param s1 First string.
+ * @param s2 Second string.
+ *
+ * @return Concatenated string.
+ */
 char* concat(const char *s1, const char *s2) {
-	char *result = malloc(strlen(s1)+strlen(s2)+1);//+1 for the zero-terminator
+	/* Plus one for the zero-terminator. */
+	char *result = malloc(strlen(s1) + strlen(s2) + 1);
+
 	strcpy(result, s1);
 	strcat(result, s2);
+
 	return result;
 }
 
+/**
+ * Output generated as HTML file.
+ *
+ * @param final_bmus List of final best matching units.
+ * @param auto_reload Flag for auto reload JavaScript code.
+ */
 void output_html(BMU *final_bmus, bool auto_reload) {
 	bool found_bmu = FALSE;
-	int diff_val, max_val, min_val, x_val, y_val, z_val, i, value, red, green, blue;
-	uint x, y;
+	int diff_val;
+	int max_val;
+	int min_val;
+	int x_val;
+	int y_val;
+	int z_val;
+	int i;
+	int value;
+	int red;
+	int green;
+	int blue;
+	uint x;
+	uint y;
 	float e;
 	RGB *huebar = create_color_huebar(255);
 
@@ -376,18 +582,17 @@ void output_html(BMU *final_bmus, bool auto_reload) {
 
 	fprintf(f, "<br/><h2>Components</h2>");
 
-
 	for(int c = 0; c < total_components; c++) {
-
 		fprintf(f, "<div style=\"width:500px;height:250px\">");
 		fprintf(f, "<h3>%s</h3>", components_name[c]);
 		fprintf(f, "<div style='position: absolute;'><table style='border-collapse: collapse;'>");
-		// Search the min and max values of each vector component
+		/* Search the min and max values of each vector component. */
 		max_val = 0;
 		min_val = 9999999;
 		for(y = 0; y < MAP_HEIGHT; y++) {
 			for(x = 0; x < MAP_WIDTH; x++) {
 				x_val = (int)((map[x][y].components[c] * (samples_max_components_values[c] - samples_min_components_values[c]))/NORMALIZATION_VALUE);
+
 				if(min_val > x_val) {
 					min_val = x_val;
 				}
@@ -426,7 +631,6 @@ void output_html(BMU *final_bmus, bool auto_reload) {
 		fprintf(f, "</div>");
 	}
 
-
 	fprintf(f, "</tr></table>");
 
 	free(huebar);
@@ -434,10 +638,15 @@ void output_html(BMU *final_bmus, bool auto_reload) {
 	fclose(f);
 }
 
-// END Kohonen algorithm methods
+/* END Kohonen algorithm methods. */
 
+/**
+ * Appcliation single entry point.
+ *
+ * @param argc Nubmer of command line arguments.
+ * @param argv Command line arguments as list of strings.
+ */
 int main(int argc, char **argv) {
-	// usage: ./kohonen file_with_samples
 	char *filename = argv[1];
 	load_and_initialize_samples(filename);
 
@@ -445,7 +654,8 @@ int main(int argc, char **argv) {
 	float ROUND_INC = 1.0f/(float)(MAX_TRAINING_ROUNDS);
 	float r = 0.0f;
 
-	int MAX_ITER_PER_ROUND = total_samples * 30; // Number of iterations is 30 times the number of input samples
+	/* Number of iterations is 30 times the number of input samples. */
+	int MAX_ITER_PER_ROUND = total_samples * 30;
 	float T_INC = 1.0f/(float)(MAX_ITER_PER_ROUND);
 	float t = 0.0f;
 	BMU *bmu;
@@ -454,7 +664,7 @@ int main(int argc, char **argv) {
 	int round_num;
 	Sample *sample;
 
-	// seed random
+	/* Seed of pseudo-random number generator. */
 	srand(time(NULL));
 
 	final_bmus = (BMU *)malloc(sizeof(BMU) * total_samples);
@@ -474,7 +684,8 @@ int main(int argc, char **argv) {
 
 		while(t < 1.0f) {
 			sample = pick_random_sample();
-			bmu = search_bmu(sample); // Best Match Unit
+			/* Best matching unit. */
+			bmu = search_bmu(sample);
 			scale_neighbors(bmu, sample, t);
 			free(bmu);
 
@@ -489,10 +700,11 @@ int main(int argc, char **argv) {
 		round_num++;
 	}
 
-	// Save the BMU coordinates in the SOM map
+	/* Save the BMU coordinates in the SOM map. */
 	for (int i = 0; i < total_samples; i++) {
 		sample = pick_sample(i);
-		bmu = search_bmu(sample); // Best Match Unit
+		/* Best matching unit. */
+		bmu = search_bmu(sample);
 
 		final_bmus[i].x_coord = (uint)bmu->x_coord;
 		final_bmus[i].y_coord = (uint)bmu->y_coord;
